@@ -9,12 +9,7 @@ action :add do
     group = new_resource.group
 
     ai_selected_model = new_resource.ai_selected_model
-    exec_start = '/usr/lib/redborder/bin/rb_ai.sh --fast --port 50505 --host 0.0.0.0'
-
-    # Old models must have this arg
-    if ai_selected_model == '5' || ai_selected_model == '7' || ai_selected_model == '8' || ai_selected_model == '9'
-      exec_start += ' --nobrowser'
-    end
+    model_name = `ls /var/lib/redborder-ai/model_sources/#{ai_selected_model}`.strip
 
     cpus = new_resource.cpus
 
@@ -29,7 +24,7 @@ action :add do
       not_if "getent passwd #{user}"
     end
 
-    %w(/etc/redborder-ai /var/lib/redborder-ai var/lib/redborder-ai/model_sources).each do |path|
+    %w(/etc/redborder-ai /var/lib/redborder-ai /var/lib/redborder-ai/model_sources).each do |path|
       directory path do
         owner user
         group user
@@ -43,7 +38,7 @@ action :add do
       group group
       mode '0755'
       action :create
-      only_if { ai_selected_model }
+      only_if { !ai_selected_model.nil? && !ai_selected_model.empty? }
     end
 
     directory '/etc/systemd/system/redborder-ai.service.d' do
@@ -56,18 +51,36 @@ action :add do
     ruby_block 'check_if_need_to_download_model' do
       block do
         dir_path = "/var/lib/redborder-ai/model_sources/#{ai_selected_model}"
+        symlink_path = '/usr/lib/redborder/bin/ai-model'
+        target_path = "/var/lib/redborder-ai/model_sources/#{ai_selected_model}/#{model_name}"
+        service_needs_restart = false
+
         if Dir.exist?(dir_path) && Dir.empty?(dir_path)
           Chef::Log.info("#{dir_path} is empty, triggering run_get_ai_model")
           resources(execute: 'run_get_ai_model').run_action(:run)
+          service_needs_restart = true
+        elsif Dir.exist?(dir_path) && !Dir.empty?(dir_path)
+          if ::File.symlink?(symlink_path) && ::File.readlink(symlink_path) == target_path
+            Chef::Log.info('Symlink already points to the correct model, skipping update.')
+          else
+            Chef::Log.info("#{dir_path} is not empty, triggering update_ai_model")
+            resources(execute: 'update_ai_model').run_action(:run)
+            service_needs_restart = true
+          end
         end
+        resources(service: 'redborder-ai').run_action(:restart) if service_needs_restart
       end
       action :nothing
-      only_if { ai_selected_model }
-      notifies :restart, 'service[redborder-ai]', :delayed
+      only_if { !ai_selected_model.nil? && !ai_selected_model.empty? }
     end
 
     execute 'run_get_ai_model' do
       command "/usr/lib/redborder/bin/rb_get_ai_model #{ai_selected_model}"
+      action :nothing
+    end
+
+    execute 'update_ai_model' do
+      command "rm -f /usr/lib/redborder/bin/ai-model; ln -s /var/lib/redborder-ai/model_sources/#{ai_selected_model}/#{model_name} /usr/lib/redborder/bin/ai-model"
       action :nothing
     end
 
@@ -83,7 +96,7 @@ action :add do
       block {}
       action :run
       notifies :run, 'ruby_block[check_if_need_to_download_model]', :immediately
-      only_if { ai_selected_model }
+      only_if { !ai_selected_model.nil? && !ai_selected_model.empty? }
     end
 
     # TEMPLATES
@@ -94,7 +107,7 @@ action :add do
       mode '0644'
       retries 2
       cookbook 'rb-ai'
-      variables(cpus: cpus, exec_start: exec_start)
+      variables(cpus: cpus)
       notifies :run, 'execute[systemctl-daemon-reload]', :delayed
       notifies :restart, 'service[redborder-ai]', :delayed
     end
@@ -141,11 +154,12 @@ action :register do
     ipaddress = new_resource.ipaddress
 
     unless node['redborder-ai']['registered']
-      query = {}
-      query['ID'] = "redborder-ai-#{node['hostname']}"
-      query['Name'] = 'redborder-ai'
-      query['Address'] = ipaddress
-      query['Port'] = 50505
+      query = {
+        'ID' => "redborder-ai-#{node['hostname']}",
+        'Name' => 'redborder-ai',
+        'Address' => ipaddress,
+        'Port' => 50505,
+      }
       json_query = Chef::JSONCompat.to_json(query)
 
       execute 'Register service in consul' do
