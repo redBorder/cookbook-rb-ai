@@ -1,4 +1,4 @@
 # Flags
-default['redborder-ai']['registered'] = false
-default['redborder-ai']['ai_selected_model'] = nil
-default['redborder-ai']['cpus'] = '0'
+default['redborder-llm']['registered'] = false
+default['redborder-llm']['llm_selected_model'] = nil
+default['redborder-llm']['cpus'] = '0'

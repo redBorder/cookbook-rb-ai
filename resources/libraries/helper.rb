@@ -1,4 +1,4 @@
-module Rbai
+module Rbllm
   module Helper
   end
 end

@@ -1,4 +1,4 @@
-cookbook-rb-ai CHANGELOG
+cookbook-rb-llm CHANGELOG
 ===============
 
 ## 0.1.3

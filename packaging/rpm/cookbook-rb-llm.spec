@@ -1,13 +1,13 @@
-%global cookbook_path /var/chef/cookbooks/rb-ai
+%global cookbook_path /var/chef/cookbooks/rb-llm
 
-Name: cookbook-rb-ai
+Name: cookbook-rb-llm
 Version: %{__version}
 Release: %{__release}%{?dist}
 BuildArch: noarch
-Summary: Redborder cookbook to install and configure redborder-rb-ai
+Summary: Redborder cookbook to install and configure redborder-rb-llm
 
 License: AGPL 3.0
-URL: https://github.com/redBorder/cookbook-rb-ai
+URL: https://github.com/redBorder/cookbook-rb-llm
 Source0: %{name}-%{version}.tar.gz
 
 %description
@@ -25,8 +25,8 @@ chmod -R 0755 %{buildroot}%{cookbook_path}
 install -D -m 0644 README.md %{buildroot}%{cookbook_path}/README.md
 
 %pre
-if [ -d /var/chef/cookbooks/rb-ai ]; then
-    rm -rf /var/chef/cookbooks/rb-ai
+if [ -d /var/chef/cookbooks/rb-llm ]; then
+    rm -rf /var/chef/cookbooks/rb-llm
 fi
 
 %post
@@ -37,14 +37,14 @@ case "$1" in
   ;;
   2)
     # This is an upgrade.
-    su - -s /bin/bash -c 'source /etc/profile && rvm gemset use default && env knife cookbook upload rb-ai'
+    su - -s /bin/bash -c 'source /etc/profile && rvm gemset use default && env knife cookbook upload rb-llm'
   ;;
 esac
 
 %postun
 # Deletes directory when uninstall the package
-if [ "$1" = 0 ] && [ -d /var/chef/cookbooks/rb-ai ]; then
-  rm -rf /var/chef/cookbooks/rb-ai
+if [ "$1" = 0 ] && [ -d /var/chef/cookbooks/rb-llm ]; then
+  rm -rf /var/chef/cookbooks/rb-llm
 fi
 
 %files
